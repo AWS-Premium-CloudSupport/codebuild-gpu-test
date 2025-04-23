@@ -7,7 +7,7 @@ on:
 jobs:
   build:
     runs-on:
-      - gpu-test-1-${{ github.run_id }}-${{ github.run_attempt }}
+      - gpu-test-4-${{ github.run_id }}-${{ github.run_attempt }}
       - image:381492037974.dkr.ecr.us-east-1.amazonaws.com/codebuild-cuda12:latest
       - instance-size:gpu_large
       - buildspec-override:true
