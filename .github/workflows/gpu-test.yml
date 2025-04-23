@@ -3,17 +3,16 @@ on:
   push:
     branches:
       - main
+
 jobs:
   build:
     runs-on:
-      - self-hosted
       - codebuild-gpu-runner-${{ github.run_id }}-${{ github.run_attempt }}
-    container:
-      image: 381492037974.dkr.ecr.us-east-1.amazonaws.com/codebuild-cuda12:latest
-      options: --gpus all
+      - image:381492037974.dkr.ecr.us-east-1.amazonaws.com/codebuild-cuda12:latest
+      - instance-size:gpu_large
+      - buildspec-override:true
     steps:
       - uses: actions/checkout@v3
       - name: Run GPU Tests
         run: |
-          nvidia-smi
-          nvcc --version
+          echo "This is handled by CodeBuild. See buildspec.yml for execution."
