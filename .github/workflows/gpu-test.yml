@@ -1,0 +1,16 @@
+name: GPU Test Workflow
+on:
+  push:
+    branches:
+      - main
+jobs:
+  build:
+    runs-on:
+      - self-hosted
+    steps:
+      - uses: actions/checkout@v3
+      - name: Print Environment Info
+        run: |
+          echo "Test Job"
+          nvidia-smi || echo "No GPU"
+          nvcc --version || echo "nvcc not installed"
