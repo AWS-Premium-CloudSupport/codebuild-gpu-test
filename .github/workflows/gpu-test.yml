@@ -1,14 +1,13 @@
 name: GPU Test Workflow
 on:
   push:
-    branches: [ main ]
-
+    branches:
+      - main
 jobs:
   build:
     runs-on:
-      - codebuild-gpu-test-4-${{ github.run_id }}-${{ github.run_attempt }}
-      - image:381492037974.dkr.ecr.us-east-1.amazonaws.com/codebuild-cuda12:latest
-      - instance-size:gpu_large
+      - codebuild-gpu-test-4-${{ github.run_id }}-${{ github.run_attempt
+        }},image:381492037974.dkr.ecr.us-east-1.amazonaws.com/codebuild-cuda12:latest,instance-size:gpu_large
     steps:
       - uses: actions/checkout@v3
       - name: Show CUDA + Driver Info
