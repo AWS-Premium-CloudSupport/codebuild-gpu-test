@@ -6,7 +6,9 @@ on:
 jobs:
   build:
     runs-on:
-      - self-hosted
+       - codebuild-gpu-runner-${{ github.run_id }}-${{ github.run_attempt }}
+       - image:nvidia/cuda:12.2.2-runtime-ubuntu22.04
+       - instance-size:gpu_large
     steps:
       - uses: actions/checkout@v3
       - name: Print Environment Info
