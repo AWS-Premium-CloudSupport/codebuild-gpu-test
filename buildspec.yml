@@ -1,0 +1,7 @@
+version: 0.2
+phases:
+  build:
+    commands:
+      - echo "Hello from buildspec"
+      - nvidia-smi || echo "No GPU"
+      - nvcc --version || echo "nvcc not installed"
