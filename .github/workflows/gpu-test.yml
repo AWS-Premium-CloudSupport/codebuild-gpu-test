@@ -6,13 +6,14 @@ on:
 jobs:
   build:
     runs-on:
-       - codebuild-gpu-runner-${{ github.run_id }}-${{ github.run_attempt }}
-       - image:nvidia/cuda:12.2.2-runtime-ubuntu22.04
-       - instance-size:gpu_large
+      - self-hosted
+      - codebuild-gpu-runner-${{ github.run_id }}-${{ github.run_attempt }}
+    container:
+      image: 381492037974.dkr.ecr.us-east-1.amazonaws.com/codebuild-cuda12:latest
+      options: --gpus all
     steps:
       - uses: actions/checkout@v3
-      - name: Print Environment Info
+      - name: Run GPU Tests
         run: |
-          echo "Test Job"
-          nvidia-smi || echo "No GPU"
-          nvcc --version || echo "nvcc not installed"
+          nvidia-smi
+          nvcc --version
