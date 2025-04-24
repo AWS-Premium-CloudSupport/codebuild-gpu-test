@@ -1,33 +1,26 @@
 name: GPU Test Workflow
+
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on:
-      - codebuild-gpu-test-4-${{ github.run_id }}-${{ github.run_attempt }}
-      - image:381492037974.dkr.ecr.us-east-1.amazonaws.com/codebuild-cuda12:latest
+      - codebuild-gpu-test-${{ github.run_id }}-${{ github.run_attempt }}
       - instance-size:gpu_large
+
     steps:
       - uses: actions/checkout@v3
-      - name: Show CUDA + Driver Info
+
+      - name: Verify Environment
         run: |
-          echo "---- nvidia-smi ----"
-          nvidia-smi || echo "No GPU"
-          echo "---- nvcc version ----"
-          nvcc --version || echo "nvcc not installed"
-      - name: Check Environment
+          nvidia-smi
+          nvcc --version
+          
+      - name: Compile and Run CUDA Test
         run: |
-          echo "==== /etc/os-release ===="
-          cat /etc/os-release || echo "missing"
-          echo "==== Docker Info ===="
-          docker info || echo "no docker"
-          echo "==== Current User ===="
-          whoami
-      - name: List CUDA Directories
-        run: |
-          echo "==== /usr/local ===="
-          ls -lh /usr/local
-          echo "==== /usr/local/cuda ===="
-          ls -lh /usr/local/cuda || echo "/usr/local/cuda missing"
+          nvcc test.cu -o test
+          ./test
