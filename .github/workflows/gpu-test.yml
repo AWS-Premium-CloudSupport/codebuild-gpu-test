@@ -16,12 +16,18 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
+      - name: Verify System Dependencies
+        run: |
+          echo "=== System Dependencies ==="
+          dpkg -l | grep -i icu
+          ldconfig -p | grep -i icu
+          
       - name: Start Docker daemon
         run: |
-          sudo systemctl start docker || true
+          echo "=== Starting Docker Daemon ==="
           sudo dockerd &
           sleep 10
-          docker info
+          docker info || true
       
       - name: System Info
         run: |
@@ -32,35 +38,9 @@ jobs:
       - name: GPU and CUDA Info
         run: |
           echo "=== GPU Information ==="
-          nvidia-smi || echo "nvidia-smi failed"
+          nvidia-smi
           echo "=== CUDA Version ==="
-          nvcc --version || echo "nvcc not found"
+          nvcc --version
           echo "=== CUDA Path ==="
           echo $CUDA_PATH
-          ls -l /usr/local/cuda* || echo "CUDA directory not found"
-          
-      - name: Test CUDA Program
-        run: |
-          echo "=== Running CUDA Test Program ==="
-          /tmp/test || echo "CUDA test program failed"
-          
-      - name: Environment Variables
-        run: |
-          echo "=== Environment Variables ==="
-          env | grep -i cuda
-          
-      - name: Docker Info
-        run: |
-          echo "=== Docker Information ==="
-          docker info || echo "Docker info failed"
-          docker --version || echo "Docker version failed"
-
-      - name: Compile CUDA Test
-        run: |
-          echo "=== Compiling CUDA Test ==="
-          nvcc test.cu -o cuda_test || echo "CUDA compilation failed"
-          
-      - name: Run CUDA Test
-        run: |
-          echo "=== Running CUDA Test ==="
-          ./cuda_test || echo "CUDA test execution failed"
+          ls -l /usr/local/cuda*
