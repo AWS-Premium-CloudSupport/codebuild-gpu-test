@@ -36,48 +36,55 @@ jobs:
           echo "=== CUDA Version ==="
           nvcc --version
           
-      - name: Run CUDA Tests
+      - name: Create and Run Basic CUDA Test
         run: |
-          echo "=== Running Basic CUDA Test ==="
-          ./cuda_test
-          echo "=== Running Vector Addition CUDA Test ==="
-          ./vector_add
-          
-      - name: Compile and Run New CUDA Program
-        run: |
-          echo "=== Creating new CUDA program ==="
-          cat > matrix_mul.cu << 'EOL'
+          echo "=== Creating Basic CUDA Test ==="
+          cat > basic_test.cu << 'EOL'
           #include <stdio.h>
-          #include <cuda_runtime.h>
           
-          __global__ void matrixMul(int *a, int *b, int *c, int n) {
-              int row = blockIdx.y * blockDim.y + threadIdx.y;
-              int col = blockIdx.x * blockDim.x + threadIdx.x;
-              
-              if (row < n && col < n) {
-                  int sum = 0;
-                  for (int k = 0; k < n; k++) {
-                      sum += a[row * n + k] * b[k * n + col];
-                  }
-                  c[row * n + col] = sum;
-              }
+          __global__ void hello_kernel() {
+              printf("Hello from GPU! (Thread %d)\n", threadIdx.x);
           }
           
           int main() {
-              int n = 4;  // Small matrix size for testing
-              size_t size = n * n * sizeof(int);
+              hello_kernel<<<1, 4>>>();
+              cudaDeviceSynchronize();
+              return 0;
+          }
+          EOL
+          
+          echo "=== Compiling Basic CUDA Test ==="
+          nvcc basic_test.cu -o basic_test
+          
+          echo "=== Running Basic CUDA Test ==="
+          ./basic_test
+          
+      - name: Create and Run Vector Addition Test
+        run: |
+          echo "=== Creating Vector Addition Test ==="
+          cat > vector_add.cu << 'EOL'
+          #include <stdio.h>
+          #include <cuda_runtime.h>
+          
+          __global__ void vectorAdd(float *a, float *b, float *c, int n) {
+              int i = blockIdx.x * blockDim.x + threadIdx.x;
+              if (i < n) c[i] = a[i] + b[i];
+          }
+          
+          int main() {
+              int n = 1024;
+              size_t size = n * sizeof(float);
               
-              int *h_a = (int *)malloc(size);
-              int *h_b = (int *)malloc(size);
-              int *h_c = (int *)malloc(size);
+              float *h_a = (float *)malloc(size);
+              float *h_b = (float *)malloc(size);
+              float *h_c = (float *)malloc(size);
               
-              // Initialize matrices
-              for (int i = 0; i < n * n; i++) {
-                  h_a[i] = 1;
-                  h_b[i] = 2;
+              for (int i = 0; i < n; i++) {
+                  h_a[i] = i * 1.0f;
+                  h_b[i] = i * 2.0f;
               }
               
-              int *d_a, *d_b, *d_c;
+              float *d_a, *d_b, *d_c;
               cudaMalloc(&d_a, size);
               cudaMalloc(&d_b, size);
               cudaMalloc(&d_c, size);
@@ -85,21 +92,21 @@ jobs:
               cudaMemcpy(d_a, h_a, size, cudaMemcpyHostToDevice);
               cudaMemcpy(d_b, h_b, size, cudaMemcpyHostToDevice);
               
-              dim3 threadsPerBlock(2, 2);
-              dim3 numBlocks((n + threadsPerBlock.x - 1) / threadsPerBlock.x,
-                           (n + threadsPerBlock.y - 1) / threadsPerBlock.y);
-              
-              matrixMul<<<numBlocks, threadsPerBlock>>>(d_a, d_b, d_c, n);
+              int blockSize = 256;
+              int numBlocks = (n + blockSize - 1) / blockSize;
+              vectorAdd<<<numBlocks, blockSize>>>(d_a, d_b, d_c, n);
               
               cudaMemcpy(h_c, d_c, size, cudaMemcpyDeviceToHost);
               
-              printf("Matrix Multiplication Result:\\n");
+              bool success = true;
               for (int i = 0; i < n; i++) {
-                  for (int j = 0; j < n; j++) {
-                      printf("%d ", h_c[i * n + j]);
+                  if (h_c[i] != h_a[i] + h_b[i]) {
+                      printf("Verification failed at %d\n", i);
+                      success = false;
+                      break;
                   }
-                  printf("\\n");
               }
+              if (success) printf("CUDA Vector Addition Test Passed!\n");
               
               cudaFree(d_a);
               cudaFree(d_b);
@@ -112,8 +119,41 @@ jobs:
           }
           EOL
           
-          echo "=== Compiling Matrix Multiplication Program ==="
-          nvcc matrix_mul.cu -o matrix_mul
+          echo "=== Compiling Vector Addition Test ==="
+          nvcc vector_add.cu -o vector_add
           
-          echo "=== Running Matrix Multiplication Program ==="
-          ./matrix_mul
+          echo "=== Running Vector Addition Test ==="
+          ./vector_add
+
+      - name: CUDA Device Properties
+        run: |
+          echo "=== Creating Device Properties Test ==="
+          cat > device_info.cu << 'EOL'
+          #include <stdio.h>
+          #include <cuda_runtime.h>
+          
+          int main() {
+              int deviceCount;
+              cudaGetDeviceCount(&deviceCount);
+              printf("Found %d CUDA devices\n", deviceCount);
+              
+              for (int i = 0; i < deviceCount; i++) {
+                  cudaDeviceProp prop;
+                  cudaGetDeviceProperties(&prop, i);
+                  printf("\nDevice %d: %s\n", i, prop.name);
+                  printf("  Compute capability: %d.%d\n", prop.major, prop.minor);
+                  printf("  Total global memory: %.2f GB\n", prop.totalGlobalMem / (1024.0 * 1024.0 * 1024.0));
+                  printf("  Max threads per block: %d\n", prop.maxThreadsPerBlock);
+                  printf("  Max threads dimensions: (%d, %d, %d)\n", prop.maxThreadsDim[0], prop.maxThreadsDim[1], prop.maxThreadsDim[2]);
+                  printf("  Max grid dimensions: (%d, %d, %d)\n", prop.maxGridSize[0], prop.maxGridSize[1], prop.maxGridSize[2]);
+                  printf("  Warp size: %d\n", prop.warpSize);
+              }
+              return 0;
+          }
+          EOL
+          
+          echo "=== Compiling Device Properties Test ==="
+          nvcc device_info.cu -o device_info
+          
+          echo "=== Running Device Properties Test ==="
+          ./device_info
