@@ -16,16 +16,12 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - name: Verify System Dependencies
-        run: |
-          echo "=== System Dependencies ==="
-          dpkg -l | grep -i icu
-          ldconfig -p | grep -i icu
-          
       - name: Start Docker daemon
         run: |
+          echo "=== Docker Configuration ==="
+          cat /etc/docker/daemon.json
           echo "=== Starting Docker Daemon ==="
-          sudo dockerd &
+          dockerd --storage-driver=vfs &
           sleep 10
           docker info || true
       
@@ -42,5 +38,30 @@ jobs:
           echo "=== CUDA Version ==="
           nvcc --version
           echo "=== CUDA Path ==="
-          echo $CUDA_PATH
           ls -l /usr/local/cuda*
+          
+      - name: Test CUDA Program
+        run: |
+          echo "=== Running CUDA Test Program ==="
+          /tmp/test
+          
+      - name: Create and Run New CUDA Program
+        run: |
+          echo "=== Creating new CUDA program ==="
+          cat > test.cu << 'EOL'
+          #include <stdio.h>
+          __global__ void hello_kernel() {
+              printf("Hello from GPU! (Thread %d)\n", threadIdx.x);
+          }
+          int main() {
+              hello_kernel<<<1, 4>>>();
+              cudaDeviceSynchronize();
+              return 0;
+          }
+          EOL
+          
+          echo "=== Compiling CUDA program ==="
+          nvcc test.cu -o test
+          
+          echo "=== Running CUDA program ==="
+          ./test
