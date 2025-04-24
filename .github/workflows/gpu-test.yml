@@ -16,52 +16,104 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - name: Start Docker daemon
-        run: |
-          echo "=== Docker Configuration ==="
-          cat /etc/docker/daemon.json
-          echo "=== Starting Docker Daemon ==="
-          dockerd --storage-driver=vfs &
-          sleep 10
-          docker info || true
-      
       - name: System Info
         run: |
           echo "=== System Information ==="
           uname -a
           cat /etc/os-release
           
-      - name: GPU and CUDA Info
+      - name: Environment Info
+        run: |
+          echo "=== Environment Variables ==="
+          env | grep -i cuda
+          echo "=== CUDA Path ==="
+          ls -l /usr/local/cuda*
+          
+      - name: GPU Info
         run: |
           echo "=== GPU Information ==="
           nvidia-smi
           echo "=== CUDA Version ==="
           nvcc --version
-          echo "=== CUDA Path ==="
-          ls -l /usr/local/cuda*
           
-      - name: Test CUDA Program
+      - name: Run CUDA Tests
         run: |
-          echo "=== Running CUDA Test Program ==="
-          /tmp/test
+          echo "=== Running Basic CUDA Test ==="
+          ./cuda_test
+          echo "=== Running Vector Addition CUDA Test ==="
+          ./vector_add
           
-      - name: Create and Run New CUDA Program
+      - name: Compile and Run New CUDA Program
         run: |
           echo "=== Creating new CUDA program ==="
-          cat > test.cu << 'EOL'
+          cat > matrix_mul.cu << 'EOL'
           #include <stdio.h>
-          __global__ void hello_kernel() {
-              printf("Hello from GPU! (Thread %d)\n", threadIdx.x);
+          #include <cuda_runtime.h>
+          
+          __global__ void matrixMul(int *a, int *b, int *c, int n) {
+              int row = blockIdx.y * blockDim.y + threadIdx.y;
+              int col = blockIdx.x * blockDim.x + threadIdx.x;
+              
+              if (row < n && col < n) {
+                  int sum = 0;
+                  for (int k = 0; k < n; k++) {
+                      sum += a[row * n + k] * b[k * n + col];
+                  }
+                  c[row * n + col] = sum;
+              }
           }
+          
           int main() {
-              hello_kernel<<<1, 4>>>();
-              cudaDeviceSynchronize();
+              int n = 4;  // Small matrix size for testing
+              size_t size = n * n * sizeof(int);
+              
+              int *h_a = (int *)malloc(size);
+              int *h_b = (int *)malloc(size);
+              int *h_c = (int *)malloc(size);
+              
+              // Initialize matrices
+              for (int i = 0; i < n * n; i++) {
+                  h_a[i] = 1;
+                  h_b[i] = 2;
+              }
+              
+              int *d_a, *d_b, *d_c;
+              cudaMalloc(&d_a, size);
+              cudaMalloc(&d_b, size);
+              cudaMalloc(&d_c, size);
+              
+              cudaMemcpy(d_a, h_a, size, cudaMemcpyHostToDevice);
+              cudaMemcpy(d_b, h_b, size, cudaMemcpyHostToDevice);
+              
+              dim3 threadsPerBlock(2, 2);
+              dim3 numBlocks((n + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                           (n + threadsPerBlock.y - 1) / threadsPerBlock.y);
+              
+              matrixMul<<<numBlocks, threadsPerBlock>>>(d_a, d_b, d_c, n);
+              
+              cudaMemcpy(h_c, d_c, size, cudaMemcpyDeviceToHost);
+              
+              printf("Matrix Multiplication Result:\\n");
+              for (int i = 0; i < n; i++) {
+                  for (int j = 0; j < n; j++) {
+                      printf("%d ", h_c[i * n + j]);
+                  }
+                  printf("\\n");
+              }
+              
+              cudaFree(d_a);
+              cudaFree(d_b);
+              cudaFree(d_c);
+              free(h_a);
+              free(h_b);
+              free(h_c);
+              
               return 0;
           }
           EOL
           
-          echo "=== Compiling CUDA program ==="
-          nvcc test.cu -o test
+          echo "=== Compiling Matrix Multiplication Program ==="
+          nvcc matrix_mul.cu -o matrix_mul
           
-          echo "=== Running CUDA program ==="
-          ./test
+          echo "=== Running Matrix Multiplication Program ==="
+          ./matrix_mul
