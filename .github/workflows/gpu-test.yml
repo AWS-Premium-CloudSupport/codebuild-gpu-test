@@ -10,17 +10,40 @@ jobs:
   build:
     runs-on:
       - codebuild-gpu-test-${{ github.run_id }}-${{ github.run_attempt }}
+      - image:381492037974.dkr.ecr.us-east-1.amazonaws.com/codebuild-cuda12-test:latest
       - instance-size:gpu_large
 
     steps:
       - uses: actions/checkout@v3
-
-      - name: Verify Environment
+      
+      - name: System Info
         run: |
-          nvidia-smi
-          nvcc --version
+          echo "=== System Information ==="
+          uname -a
+          cat /etc/os-release
           
-      - name: Compile and Run CUDA Test
+      - name: GPU and CUDA Info
         run: |
-          nvcc test.cu -o test
-          ./test
+          echo "=== GPU Information ==="
+          nvidia-smi
+          echo "=== CUDA Version ==="
+          nvcc --version
+          echo "=== CUDA Path ==="
+          echo $CUDA_PATH
+          ls -l /usr/local/cuda*
+          
+      - name: Test CUDA Program
+        run: |
+          echo "=== Running CUDA Test Program ==="
+          /tmp/test
+          
+      - name: Environment Variables
+        run: |
+          echo "=== Environment Variables ==="
+          env | grep -i cuda
+          
+      - name: Docker Info
+        run: |
+          echo "=== Docker Information ==="
+          docker info
+          docker --version
